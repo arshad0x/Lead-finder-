@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<title>LeadHunter AI</title>
+<style>
+:root{--bg:#0b1220;--card:#131c2e;--ink:#eaf0fb;--mute:#8d9bb5;--pri:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--line:#22304a;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+@media(prefers-color-scheme:light){:root{--bg:#f3f6fb;--card:#fff;--ink:#0f172a;--mute:#5b6b85;--pri:#2563eb;--line:#dbe3f0}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans)}
+body{padding-top:env(safe-area-inset-top,0px)}
+#app{max-width:560px;margin:0 auto;height:100%;display:flex;flex-direction:column}
+header{padding:14px 16px 10px}
+header h1{margin:0;font-size:22px;letter-spacing:-.3px}
+header h1 span{color:var(--pri)}
+header p{margin:2px 0 0;color:var(--mute);font-size:13px}
+main{flex:1;overflow-y:auto;padding:0 16px 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:12px;color:var(--mute);margin:10px 0 4px}
+input,select,textarea{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+textarea{min-height:150px;resize:vertical}
+button,.btn{border:0;border-radius:10px;padding:11px 14px;font:600 14px var(--sans);background:var(--pri);color:#fff;cursor:pointer;text-decoration:none;display:inline-block;text-align:center}
+button.ghost,.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+button.wa,.btn.wa{background:#25d366;color:#04361b}
+button.full{width:100%;margin-top:14px;padding:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.row>*{flex:1}
+.lead h3{margin:0;font-size:16px}
+.meta{color:var(--mute);font-size:13px;margin-top:2px}
+.tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(59,130,246,.15);color:var(--pri);margin-right:6px;font-weight:600}
+.tag.nw{background:rgba(34,197,94,.15);color:var(--ok)}
+.empty{text-align:center;color:var(--mute);padding:40px 10px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.stats div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.stats b{display:block;font-size:20px}
+.stats span{font-size:11px;color:var(--mute)}
+nav{display:flex;border-top:1px solid var(--line);background:var(--card);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;background:none;color:var(--mute);border-radius:0;padding:12px 4px;font-size:12px}
+nav button.on{color:var(--pri)}
+#sheet{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-end;z-index:9}
+#sheet.show{display:flex}
+#sheet .in{background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.spin{opacity:.6;pointer-events:none}
+.note{font-size:12px;color:var(--mute);margin-top:8px}
+</style>
+</head>
+<body>
+<div id="app">
+<header><h1>Lead<span>Hunter</span> AI</h1><p>Bina website wale active businesses dhundo aur AI se pitch likhwao</p></header>
+<main id="main"></main>
+<nav id="nav"></nav>
+</div>
+<div id="sheet"><div class="in">
+  <b id="stitle"></b>
+  <textarea id="smsg"></textarea>
+  <div class="row"><button class="ghost" id="regen">AI se dubara likho</button><button class="ghost" id="copy">Copy</button></div>
+  <div class="row"><a class="btn wa" id="swa" target="_blank" rel="noopener">WhatsApp kholo</a><button class="ghost" id="sclose">Band karo</button></div>
+</div></div>
+
+<script>
+var $=function(i){return document.getElementById(i)};
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML}
+function ld(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+var S=ld('lh_set',{gk:'',ck:'',link:'',me:''}), saved=ld('lh_saved',[]), results=[], tab='find', busy=false, cur=null;
+var SOCIAL=['instagram.com','facebook.com','wa.me','linktr.ee','justdial.com','indiamart.com'];
+var DEMO=[
+ {id:'d1',name:'Shree Ganesh Furniture',type:'furniture shop',city:'Pune',phone:'098765 43210',rating:4.6,reviews:128,maps:'#'},
+ {id:'d2',name:'Iron Zone Gym',type:'gym',city:'Pune',phone:'091234 56789',rating:4.4,reviews:86,maps:'#'},
+ {id:'d3',name:'Glow Ladies Salon',type:'salon',city:'Pune',phone:'090000 11122',rating:4.8,reviews:203,maps:'#'}];
+
+function wa(p,t){var d=String(p||'').replace(/\D/g,'').replace(/^0+/,'');if(d.length==10)d='91'+d;return 'https://wa.me/'+d+(t?'?text='+encodeURIComponent(t):'')}
+function tel(p){return 'tel:'+String(p||'').replace(/[^\d+]/g,'')}
+
+function render(){
+  var m=$('main');
+  $('nav').innerHTML=[['find','Khojo'],['saved','Saved ('+saved.length+')'],['set','Settings']].map(function(t){return '<button data-t="'+t[0]+'" class="'+(tab==t[0]?'on':'')+'">'+t[1]+'</button>'}).join('');
+  if(tab=='find')m.innerHTML=viewFind();
+  else if(tab=='saved')m.innerHTML=viewSaved();
+  else m.innerHTML=viewSet();
+}
+function viewFind(){
+  var h='<div class="card"><label>Shehar</label><input id="city" placeholder="Pune" value="'+esc(S.city||'')+'">'+
+  '<label>Business type</label><input id="btype" placeholder="gym, salon, furniture shop, carpenter" value="'+esc(S.btype||'')+'">'+
+  '<label>Data source</label><select id="src">'+[['both','Dono (Google + OpenStreetMap)'],['google','Sirf Google (paid limit)'],['osm','Sirf OpenStreetMap (free)'],['open','Sirf Open Places API'],['all','Teeno sab (Google + OSM + Open Places)']].map(function(o){return '<option value="'+o[0]+'"'+((S.src||'both')==o[0]?' selected':'')+'>'+o[1]+'</option>'}).join('')+'</select>'+
+  '<label>Kam se kam reviews (sirf Google data par lagta hai)</label><input id="minr" type="number" value="'+(S.minr||5)+'">'+
+  '<button class="full '+(busy?'spin':'')+'" id="go">'+(busy?'Dhundh raha hu...':'Leads dhundo')+'</button>'+
+  (S.gk?'':'<div class="note">Google key nahi hai: OpenStreetMap bina key ke chalta hai, Google ke liye Settings me key daalo.</div>')+'</div>';
+  if(!results.length)return h+'<div class="empty">Shehar aur business type daalkar search karo.</div>';
+  return h+'<div class="stats"><div><b>'+results.length+'</b><span>Mile</span></div><div><b>'+saved.length+'</b><span>Saved</span></div><div><b>'+saved.filter(function(x){return x.st=='Closed'}).length+'</b><span>Closed</span></div></div>'+results.map(function(r){return card(r,false)}).join('');
+}
+function viewSaved(){
+  if(!saved.length)return '<div class="empty">Abhi koi lead save nahi hui.</div>';
+  return '<button class="ghost full" id="csv" style="margin:0 0 12px">CSV export karo</button>'+saved.map(function(r){return card(r,true)}).join('');
+}
+function card(r,isSaved){
+  var s=isSaved?'<select data-st="'+r.id+'">'+['New','Contacted','Interested','Closed'].map(function(o){return '<option'+(r.st==o?' selected':'')+'>'+o+'</option>'}).join('')+'</select>':'';
+  return '<div class="card lead"><h3>'+esc(r.name)+'</h3><div class="meta"><span class="tag nw">No website</span><span class="tag">'+esc(r.type)+'</span>'+esc(r.city)+'</div>'+
+  '<div class="meta">'+(r.src?(r.src=='op'?'Open Places data · ':'OpenStreetMap data · '):'★ '+esc(r.rating)+' ('+esc(r.reviews)+' reviews) · ')+esc(r.phone||'Phone nahi mila')+'</div>'+s+
+  '<div class="row">'+(r.phone?'<a class="btn ghost" href="'+tel(r.phone)+'">Call</a>':'<a class="btn ghost" target="_blank" rel="noopener" href="'+esc(r.maps)+'">Maps</a>')+'<button data-ai="'+r.id+'">AI pitch</button>'+
+  (isSaved?'<button class="ghost" data-del="'+r.id+'">Hatao</button>':'<button class="ghost" data-save="'+r.id+'">Save</button>')+'</div></div>';
+}
+function viewSet(){
+  return '<div class="card"><label>Google Places API key</label><input id="gk" type="password" value="'+esc(S.gk)+'">'+
+  '<label>Open Places API key (opa_live_...)</label><input id="ok" type="password" value="'+esc(S.ok)+'">'+
+  '<label>Claude API key (AI pitch ke liye, optional)</label><input id="ck" type="password" value="'+esc(S.ck)+'">'+
+  '<label>Demo website ka link (pitch me jayega)</label><input id="link" placeholder="https://..." value="'+esc(S.link)+'">'+
+  '<label>Aapka naam</label><input id="me" value="'+esc(S.me)+'">'+
+  '<button class="full" id="ssave">Save karo</button>'+
+  '<div class="note">Keys sirf is phone me save hoti hain. Claude key nahi hai to template wala pitch banega.</div></div>';
+}
+
+function findLead(id){return results.concat(saved).filter(function(x){return x.id==id})[0]}
+
+async function search(){
+  var city=$('city').value.trim(),bt=$('btype').value.trim(),minr=+$('minr').value||0;
+  S.city=city;S.btype=bt;S.minr=minr;sv('lh_set',S);
+  if(!city||!bt){alert('Shehar aur business type daalo');return}
+  busy=true;render();results=[];
+  try{
+    var src=$('src').value;S.src=src;sv('lh_set',S);
+    if(src=='osm'||src=='both'||src=='all'){try{results=results.concat(await osmSearch(city,bt))}catch(e){alert('OpenStreetMap error: '+e.message)}}
+    if(src=='open'||src=='all'){try{results=results.concat(await opSearch(city,bt))}catch(e){alert('Open Places error: '+(e instanceof TypeError?'browser ne request block ki (CORS) ya internet nahi':e.message))}}
+    if(src=='osm'||src=='open'){}
+    else if(!S.gk){if(src=='google')results=DEMO.map(function(d){return Object.assign({},d,{city:city,type:bt})})}
+    else{
+      var token=null,seen={};
+      for(var i=0;i<3;i++){
+        var body={textQuery:bt+' in '+city,pageSize:20,regionCode:'IN'};if(token)body.pageToken=token;
+        var r=await fetch('https://places.googleapis.com/v1/places:searchText',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':S.gk,'X-Goog-FieldMask':'places.id,places.displayName,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,places.businessStatus,places.googleMapsUri,nextPageToken'},body:JSON.stringify(body)});
+        var d=await r.json();
+        if(!r.ok){alert('Google error: '+((d.error&&d.error.message)||r.status));break}
+        (d.places||[]).forEach(function(p){
+          var w=(p.websiteUri||'').toLowerCase();
+          var real=w&&!SOCIAL.some(function(s){return w.indexOf(s)>-1});
+          if(seen[p.id]||real||p.businessStatus!='OPERATIONAL'||!p.nationalPhoneNumber||(p.userRatingCount||0)<minr)return;
+          seen[p.id]=1;
+          results.push({id:p.id,name:p.displayName&&p.displayName.text,type:bt,city:city,phone:p.nationalPhoneNumber,rating:p.rating||'-',reviews:p.userRatingCount||0,maps:p.googleMapsUri});
+        });
+        token=d.nextPageToken;if(!token)break;
+        await new Promise(function(z){setTimeout(z,1800)});
+      }
+      results.sort(function(a,b){return b.reviews-a.reviews});
+    }
+  }catch(e){alert('Network error: '+e.message)}
+  var sn={};results=results.filter(function(x){var k=String(x.name).toLowerCase();if(sn[k])return false;sn[k]=1;return true});
+  busy=false;render();
+}
+
+var OSMT=[[/furniture|mandir/i,'["shop"="furniture"]'],[/gym|fitness/i,'["leisure"="fitness_centre"]'],[/salon|parlou?r|beauty|hair/i,'["shop"~"hairdresser|beauty"]'],[/carpent|wood/i,'["craft"="carpenter"]'],[/tile/i,'["shop"="tiles"]'],[/electric/i,'["craft"="electrician"]'],[/restaurant|hotel|dhaba/i,'["amenity"="restaurant"]'],[/cafe/i,'["amenity"="cafe"]'],[/clinic|doctor|dental/i,'["amenity"~"clinic|doctors|dentist"]'],[/bakery/i,'["shop"="bakery"]'],[/mobile/i,'["shop"="mobile_phone"]'],[/cloth|boutique|garment/i,'["shop"="clothes"]'],[/jewel/i,'["shop"="jewelry"]'],[/hardware|paint/i,'["shop"~"hardware|paint"]'],[/pharm|medical/i,'["amenity"="pharmacy"]'],[/school|coaching|class/i,'["amenity"~"school|college|language_school"]'],[/garage|mechanic|auto/i,'["shop"="car_repair"]'],[/plumb/i,'["craft"="plumber"]']];
+async function osmSearch(city,bt){
+  var f=null;OSMT.some(function(t){if(t[0].test(bt)){f=t[1];return true}});
+  var c=city.replace(/[^A-Za-z0-9 \u0900-\u097F]/g,''),nm=bt.replace(/[^A-Za-z0-9 ]/g,'');
+  var flt=f||'["name"~"'+nm+'",i]';
+  var q='[out:json][timeout:40];area[~"^name(:en)?$"~"^'+c+'$",i]["boundary"="administrative"]->.a;nwr'+flt+'(area.a);out center tags 300;';
+  var r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)});
+  if(!r.ok)throw new Error('server '+r.status);
+  var d=await r.json(),out=[];
+  (d.elements||[]).forEach(function(e){
+    var t=e.tags||{};if(!t.name||t.disused)return;
+    var w=(t.website||t['contact:website']||t.url||'').toLowerCase();
+    if(w&&!SOCIAL.some(function(x){return w.indexOf(x)>-1}))return;
+    var ph=(t.phone||t['contact:phone']||t['contact:mobile']||t.mobile||'').split(';')[0].trim();
+    out.push({id:'osm'+e.id,name:t.name,type:bt,city:city,phone:ph,rating:'-',reviews:0,src:'osm',maps:'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(t.name+' '+city)});
+  });
+  out.sort(function(a,b){return (b.phone?1:0)-(a.phone?1:0)});
+  return out;
+}
+async function opSearch(city,bt){
+  if(!S.ok)throw new Error('Settings me Open Places key daalo');
+  var g=await (await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(city))).json();
+  if(!g[0])throw new Error('Shehar nahi mila');
+  var lat=g[0].lat,lon=g[0].lon,out=[];
+  async function call(par){
+    var r=await fetch('https://api.openplacesapi.com/v1/places?'+new URLSearchParams(Object.assign({lat:lat,lon:lon,radius_mi:30,limit:20},par)),{headers:{Authorization:'Bearer '+S.ok}});
+    var d=await r.json();
+    if(!r.ok)throw new Error((d.error&&(d.error.message||d.error))||('status '+r.status));
+    return d.results||d.places||d.data||(Array.isArray(d)?d:[]);
+  }
+  var list=await call({category:bt.toLowerCase().replace(/\s+/g,'_')});
+  if(!list.length)list=await call({q:bt});
+  list.forEach(function(p){
+    var w=String(p.website||'').toLowerCase();
+    if(w&&!SOCIAL.some(function(x){return w.indexOf(x)>-1}))return;
+    if(p.operating_status&&p.operating_status!='open')return;
+    var nm=p.name||(p.names&&p.names.primary)||'';if(!nm)return;
+    out.push({id:'op'+(p.id||nm),name:nm,type:bt,city:city,phone:p.phone||'',rating:'-',reviews:0,src:'op',maps:'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(nm+' '+city)});
+  });
+  out.sort(function(a,b){return (b.phone?1:0)-(a.phone?1:0)});
+  return out;
+}
+function template(r){
+  return 'Namaste '+r.name+' team \uD83D\uDE4F\n\nMaine Google par aapka '+r.type+' ka kaam dekha, '+(r.src?'kaam bahut acha lag raha hai':'reviews bahut acche hain ('+r.rating+' star)')+'. Dekha ki aapki website nahi hai, jab ki log pehle Google par search karte hain.\n\nMaine aise business ke liye website banayi hai jo customers ko seedha WhatsApp par enquiry bhejti hai.'+(S.link?' Ek sample dekhiye: '+S.link:'')+'\n\nInterested ho to batayiye, free demo de dunga.\n'+(S.me||'');
+}
+async function aiMsg(r){
+  if(!S.ck)return template(r);
+  try{
+    var res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':S.ck,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-5-5',max_tokens:400,messages:[{role:'user',content:'Ek chhota WhatsApp message likho (Hinglish, 70 shabd tak, polite, 1 emoji) ek web designer ki taraf se is business ko: naam '+r.name+', type '+r.type+', shehar '+r.city+', rating '+r.rating+'. Unki website nahi hai. Message me ye demo link zaroor daalo: '+(S.link||'(link baad me)')+'. Sender ka naam: '+(S.me||'')+'. Sirf message likho.'}]})});
+    var d=await res.json();
+    if(d.content&&d.content[0])return d.content[0].text;
+    throw new Error((d.error&&d.error.message)||'AI error');
+  }catch(e){alert('AI nahi chala ('+e.message+'), template use kar raha hu.');return template(r)}
+}
+async function openSheet(id){
+  cur=findLead(id);$('stitle').textContent='Pitch: '+cur.name;$('smsg').value='AI likh raha hai...';$('sheet').classList.add('show');
+  var t=await aiMsg(cur);$('smsg').value=t;upd();
+}
+function upd(){$('swa').href=wa(cur.phone,$('smsg').value)}
+
+document.addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  var d=b.dataset;
+  if(d.t){tab=d.t;render()}
+  else if(b.id=='go')search();
+  else if(d.save){var r=findLead(d.save);if(!saved.some(function(x){return x.id==r.id})){saved.unshift(Object.assign({},r,{st:'New'}));sv('lh_saved',saved);render()}}
+  else if(d.del){saved=saved.filter(function(x){return x.id!=d.del});sv('lh_saved',saved);render()}
+  else if(d.ai)openSheet(d.ai);
+  else if(b.id=='ssave'){['gk','ok','ck','link','me'].forEach(function(k){S[k]=$(k).value.trim()});sv('lh_set',S);alert('Save ho gaya')}
+  else if(b.id=='sclose')$('sheet').classList.remove('show');
+  else if(b.id=='regen'){$('smsg').value='AI likh raha hai...';aiMsg(cur).then(function(t){$('smsg').value=t;upd()})}
+  else if(b.id=='copy'){try{navigator.clipboard.writeText($('smsg').value);b.textContent='Copy ho gaya'}catch(x){$('smsg').select()}}
+  else if(b.id=='csv'){
+    var rows=[['Name','Type','City','Phone','Rating','Reviews','Status','Maps']].concat(saved.map(function(r){return [r.name,r.type,r.city,r.phone,r.rating,r.reviews,r.st,r.maps]}));
+    var c=rows.map(function(r){return r.map(function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'}).join(',')}).join('\n');
+    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+c],{type:'text/csv'}));a.download='leads.csv';a.click();
+  }
+});
+document.addEventListener('change',function(e){
+  var id=e.target.dataset&&e.target.dataset.st;
+  if(id){saved.forEach(function(x){if(x.id==id)x.st=e.target.value});sv('lh_saved',saved)}
+});
+$('smsg').addEventListener('input',function(){if(cur)upd()});
+render();
+</script>
+</body>
+</html>
